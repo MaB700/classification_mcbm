@@ -73,36 +73,6 @@ hits_sim = loadDataFile("E:/ML_data/mcbm_rich/28.07/hits_all.txt")
 hits_real = loadDataFile("E:/ML_data/mcbm_rich/real/hits_real.txt")
 hits1, hits2, label1, label2 = load_data_class(hits_sim, hits_real) #(hits_train[:,:,:,0])[..., tf.newaxis]
 
-
-custom_metrics = [get_hit_average(), get_noise_average(), get_background_average(),\
-                    get_hit_average_order1(), get_hit_average_order2()]
-# %%
-#print(label1. add axis
-# %%
-class Residual(tf.keras.layers.Layer):
-    def __init__(self, filters):
-        super(Residual, self).__init__()
-        filters1, filters2, filters3 = filters
-        self.conv2a = tf.keras.layers.Conv2D(filters1, kernel_size=1, activation='relu', padding='same')
-
-        self.conv2b = tf.keras.layers.Conv2D(filters2, kernel_size=3, activation='relu', padding='same')
-
-        self.conv2c = tf.keras.layers.Conv2D(filters3, kernel_size=5, activation='relu', padding='same')
-
-        self.pool = tf.keras.layers.AveragePooling2D(pool_size=(2,2), strides=(1,1), padding='same')
-    def get_config(self):
-        config = super().get_config().copy()
-        config.update({
-
-        })  
-        return config                    
-    def call(self, inputs):
-        outa = self.conv2a(inputs)
-        outb = self.conv2b(inputs)
-        outc = self.conv2c(inputs)
-        outpool = self.pool(inputs)
-        conc_out = tf.keras.layers.concatenate([outa, outb, outc, outpool], axis=-1)
-        return conc_out
 # %%
 def inception_block(x, filters):
     filters1, filters2, filters3 = filters
@@ -172,12 +142,8 @@ else:
     model.add(Dense(128, activation='relu'))
     #model.add(tf.keras.layers.Dropout(0.25))
     model.add(Dense(1, activation='sigmoid', use_bias=False))
-    #model.add(tf.keras.layers.Softmax()) 
+    #model.add(tf.keras.layers.Softmax()) """
 
-    model.add(Conv2DTranspose(filters=128 , kernel_size=3, strides=[2, 2],activation='relu', padding='same'))
-    model.add(Conv2DTranspose(filters=64 , kernel_size=3, strides=[2, 2],activation='relu', padding='same'))
-    model.add(Conv2DTranspose(filters=32 , kernel_size=3, strides=2,activation='relu', padding='same'))
-    model.add(Conv2D(1, kernel_size=3, activation='tanh', padding='same')) """
 
     if (load_weights == 1):
         del model
@@ -226,32 +192,6 @@ sn.heatmap(df_cm, annot=True)
 plt.xlabel('predicted labels')
 plt.ylabel('true labels')
 plt.show()
-# %%
-original_plt = tf.math.add(hits_test[:,:,:,0], tf.math.scalar_mul(2.0, hits_test[:,:,:,1]) )
-encoded = model.predict(hits_all_test, batch_size=50)
-# %%
-print(get_hit_average()(hits_test, tf.keras.layers.ReLU(threshold=0.7)(encoded)).numpy())
-
-def f1(thresholdx, mode, pred=encoded):
-    result = np.array([-1.])
-    for th in thresholdx:
-        if (mode==0):
-            av = get_hit_average()(hits_test, tf.keras.layers.ReLU(threshold=th)(pred)) 
-        elif (mode==1):
-            av = 1-get_noise_average()(hits_test, tf.keras.layers.ReLU(threshold=th)(pred))
-        result = np.append(result, av)
-    result = np.delete(result, 0)
-    return result
-
-t1 = np.arange(0., 1., 0.01)
-
-fig, ax = plt.subplots()
-ax.plot(t1, f1(t1, mode=0), '-', label='hit average')
-ax.plot(t1, f1(t1, mode=1), '-', label='1-noise average')
-ax.set(xlabel='cut', ylabel='average value')
-ax.legend()
-plt.show()
-
 
 # %%
 interactive_plot = widgets.interact(single_event_plot, \
@@ -259,24 +199,3 @@ interactive_plot = widgets.interact(single_event_plot, \
                     nof_pixel_X=fixed(32), min_X=fixed(-8.1), max_X=fixed(13.1), \
                     nof_pixel_Y=fixed(72), min_Y=fixed(-23.85), max_Y=fixed(23.85), eventNo=(50,100-1,1), cut=(0.,0.90,0.05))
 
-
-
-# # %%
-# #model.evaluate((hits_noise_test[14,:,:,:])[tf.newaxis,...], (hits_test[14,:,:,:])[tf.newaxis,...], verbose=1);
-# def hit_average_order2(data, y_pred):
-#     y_hits_in_order2 = data[14,:,:,0]*data[14,:,:,3]
-#     nofHitsInOrder2 = tf.math.count_nonzero(tf.greater(y_hits_in_order2,0.01), dtype=tf.float32)
-#     print(nofHitsInOrder2)
-#     return (K.sum(y_hits_in_order2*y_pred[14,:,:,0])/nofHitsInOrder2), nofHitsInOrder2
-
-# or2, nofhitsin02 = hit_average_order2(hits_test, encoded )
-# print(or2)
-# print(nofhitsin02)
-# # %%
-# print(tf.math.count_nonzero(tf.greater(hits_test[0,:,:,2],0.), dtype=tf.float32))
-# #tf.greater(hits_test[0,:,:,2],0.5)
-# #tf.print(hits_test[0,:,:,2], summarize=-1)
-# #print(hits_test[0,:,:,2])
-# # %%
-
-# %%
