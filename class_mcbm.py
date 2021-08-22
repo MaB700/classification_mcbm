@@ -79,58 +79,125 @@ custom_metrics = [get_hit_average(), get_noise_average(), get_background_average
 # %%
 #print(label1. add axis
 # %%
+class Residual(tf.keras.layers.Layer):
+    def __init__(self, filters):
+        super(Residual, self).__init__()
+        filters1, filters2, filters3 = filters
+        self.conv2a = tf.keras.layers.Conv2D(filters1, kernel_size=1, activation='relu', padding='same')
+
+        self.conv2b = tf.keras.layers.Conv2D(filters2, kernel_size=3, activation='relu', padding='same')
+
+        self.conv2c = tf.keras.layers.Conv2D(filters3, kernel_size=5, activation='relu', padding='same')
+
+        self.pool = tf.keras.layers.AveragePooling2D(pool_size=(2,2), strides=(1,1), padding='same')
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({
+
+        })  
+        return config                    
+    def call(self, inputs):
+        outa = self.conv2a(inputs)
+        outb = self.conv2b(inputs)
+        outc = self.conv2c(inputs)
+        outpool = self.pool(inputs)
+        conc_out = tf.keras.layers.concatenate([outa, outb, outc, outpool], axis=-1)
+        return conc_out
+# %%
+def inception_block(x, filters):
+    filters1, filters2, filters3 = filters
+    a = Conv2D(filters1, kernel_size=1, activation='relu', padding='same')(x)
+    b = Conv2D(filters2, kernel_size=3, activation='relu', padding='same')(x)
+    c = Conv2D(filters3, kernel_size=5, activation='relu', padding='same')(x)
+    d = AveragePooling2D(pool_size=(2,2), strides=(1,1), padding='same')(x)
+    return tf.keras.layers.concatenate([a, b, c, d], axis=-1)
+
+def residual_block(x, filters):
+    xi = Conv2D(filters[0], kernel_size=3, activation='relu', padding='same')(x)
+    for i in range(len(filters)-1):
+        xi = Conv2D(filters[i+1], kernel_size=3, activation='relu', padding='same')(xi)
+    out = tf.keras.layers.add([xi, x]) # number of filter in the last layer has to match input (x) feature maps 
+    return tf.nn.relu(out)
+    
+    
+# %%
+
+load_model = 0
+load_file = "save.h5"
+
 load_weights = 0
-cp_path = "tmp/cp.ckpt"
-cp_dir = os.path.dirname(cp_path)
+cp_file = "saveCp.h5"
 model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-    filepath=cp_path,
+    filepath=cp_file,
     save_weights_only=False,
     monitor='val_accuracy',
     mode='max',
     save_best_only=True,
     verbose=1)
 
-model = Sequential()
-model.add(Input(shape=(72, 32, 1)))
+if (load_model == 1):
+    print('loading model from file ' + load_file + ' ...')
+    model = tf.keras.models.load_model(load_file)
+    print('done!')
+else:
+    inputs = Input(shape=(72, 32, 1))
+    x = Conv2D(filters=16, kernel_size=5, activation='relu', padding='same')(inputs)
+    x = Conv2D(filters=32, kernel_size=3, strides=(2,2), activation='relu', padding='same')(x)
+    x = residual_block(x, (2, 32))
+    x = AveragePooling2D(pool_size=(2,2), strides=(2,2))(x)
+    x = inception_block(x, (16, 16, 16))
+    x = Conv2D(filters=64, kernel_size=3, strides=(2,2), activation='relu', padding='same')(x)
+    x = Conv2D(filters=128, kernel_size=3, activation='relu', padding='same')(x)
+    x = AveragePooling2D(pool_size=(2,2), strides=(2,2))(x)
+    x = Flatten()(x)
+    x = Dense(128, activation='relu')(x)
+    x = Dense(128, activation='relu')(x)
+    out = Dense(1, activation='sigmoid', use_bias=False)(x)
+    model = tf.keras.models.Model(inputs=inputs, outputs=out)
+    model.summary()
+    """     model = Sequential()
+    model.add(Input(shape=(72, 32, 1)))
+    model.add(Residual(filters=(16, 16, 16)))
+    model.add(Conv2D(filters=16, kernel_size=5, activation='relu', padding='same'))
+    model.add(Conv2D(filters=32, kernel_size=3, strides=(2,2), activation='relu', padding='same'))
+    model.add(AveragePooling2D(pool_size=(2,2), strides=(2,2)))
 
-model.add(Conv2D(filters=16, kernel_size=5, activation='relu', padding='same'))
-model.add(Conv2D(filters=32, kernel_size=3, strides=(2,2), activation='relu', padding='same'))
-model.add(AveragePooling2D(pool_size=(2,2), strides=(2,2)))
-
-model.add(Conv2D(filters=64, kernel_size=3, strides=(2,2), activation='relu', padding='same'))
-model.add(Conv2D(filters=128, kernel_size=3, activation='relu', padding='same'))
-model.add(AveragePooling2D(pool_size=(2,2), strides=(2,2))) 
+    model.add(Conv2D(filters=64, kernel_size=3, strides=(2,2), activation='relu', padding='same'))
+    model.add(Conv2D(filters=128, kernel_size=3, activation='relu', padding='same'))
+    model.add(AveragePooling2D(pool_size=(2,2), strides=(2,2))) 
 
 
-model.add(Flatten())
-model.add(Dense(128, activation='relu'))
-model.add(Dense(128, activation='relu'))
-#model.add(tf.keras.layers.Dropout(0.25))
-model.add(Dense(1, activation='sigmoid', use_bias=False))
-#model.add(tf.keras.layers.Softmax())
+    model.add()
+    model.add(Dense(128, activation='relu'))
+    model.add(Dense(128, activation='relu'))
+    #model.add(tf.keras.layers.Dropout(0.25))
+    model.add(Dense(1, activation='sigmoid', use_bias=False))
+    #model.add(tf.keras.layers.Softmax()) 
 
-""" model.add(Conv2DTranspose(filters=128 , kernel_size=3, strides=[2, 2],activation='relu', padding='same'))
-model.add(Conv2DTranspose(filters=64 , kernel_size=3, strides=[2, 2],activation='relu', padding='same'))
-model.add(Conv2DTranspose(filters=32 , kernel_size=3, strides=2,activation='relu', padding='same'))
-model.add(Conv2D(1, kernel_size=3, activation='tanh', padding='same')) """
-model.summary()
+    model.add(Conv2DTranspose(filters=128 , kernel_size=3, strides=[2, 2],activation='relu', padding='same'))
+    model.add(Conv2DTranspose(filters=64 , kernel_size=3, strides=[2, 2],activation='relu', padding='same'))
+    model.add(Conv2DTranspose(filters=32 , kernel_size=3, strides=2,activation='relu', padding='same'))
+    model.add(Conv2D(1, kernel_size=3, activation='tanh', padding='same')) """
 
-if (load_weights == 1):
-    print('loading weights ...\n')
-    model.load_weights(cp_path)
-    print('weights loaded! \n')
+    if (load_weights == 1):
+        del model
+        print('loading weights ...\n')
+        model = tf.keras.models.load_model(cp_file)
+        print('weights loaded! \n')
 
-#opt = tf.keras.optimizers.Adadelta(lr=1.0, rho=0.95, epsilon=1e-07 )
-opt = tf.keras.optimizers.Adam(learning_rate=0.001)
-model.compile(optimizer=opt, loss=tf.keras.losses.BinaryCrossentropy(), metrics=['accuracy'], experimental_steps_per_execution=10)
-es = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, mode='min')
-model.fit(hits1, label1,
-                epochs=50,
-                batch_size=500,
-                shuffle=True,
-                validation_data=(hits2, label2),
-                callbacks=[es])#,
-                #callbacks=[WandbCallback(log_weights=True)])
+    #opt = tf.keras.optimizers.Adadelta(lr=1.0, rho=0.95, epsilon=1e-07 )
+    opt = tf.keras.optimizers.Adam(learning_rate=0.001)
+    model.compile(optimizer=opt, loss=tf.keras.losses.BinaryCrossentropy(), metrics=['accuracy'])
+    es = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, mode='min')
+    model.fit(hits1, label1,
+                    epochs=10,
+                    batch_size=500,
+                    shuffle=True,
+                    validation_data=(hits2, label2),
+                    callbacks=[model_checkpoint_callback])#,
+                    #callbacks=[WandbCallback(log_weights=True)])
+    #model_checkpoint_callback.best 
+    model.save("save.h5")
 #print('model evaluate ...\n')
 # %%
 label_sim_pred = model.predict(hits_sim)

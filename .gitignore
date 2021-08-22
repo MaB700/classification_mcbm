@@ -2,3 +2,5 @@
 class_mcbm_functions_old.py
 tmp
 cp_weights
+*.h5
+__pycache__
