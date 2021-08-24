@@ -35,6 +35,7 @@ from wandb.keras import WandbCallback
 print('Tensorflow version: ' + tf.__version__)
 print("GPU is", "available" if tf.config.list_physical_devices('GPU') else "NOT available")
 # %%
+#test2
 massive_hits = loadDataFile("./data/hits_mass.txt")
 noiseProd_hits = createNoiseFromFile("./data/hits_mass.txt")
 interactive_plot = widgets.interact(single_event_plot, \
