@@ -35,8 +35,8 @@ from wandb.keras import WandbCallback
 print('Tensorflow version: ' + tf.__version__)
 print("GPU is", "available" if tf.config.list_physical_devices('GPU') else "NOT available")
 # %%
-massive_hits = loadDataFile("E:/ML_data/mcbm_rich/05.08/hits_mass.txt")
-noiseProd_hits = createNoiseFromFile("E:/ML_data/mcbm_rich/05.08/hits_mass.txt")
+massive_hits = loadDataFile("./data/hits_mass.txt")
+noiseProd_hits = createNoiseFromFile("./data/hits_mass.txt")
 interactive_plot = widgets.interact(single_event_plot, \
                     data=fixed(tf.squeeze(massive_hits,[3])), data0=fixed(tf.squeeze(noiseProd_hits+massive_hits,[3])), \
                     nof_pixel_X=fixed(32), min_X=fixed(-8.1), max_X=fixed(13.1), \
@@ -65,35 +65,7 @@ hits_real = loadDataFile("E:/ML_data/mcbm_rich/real/hits_real.txt")
 hits1, hits2, label1, label2 = load_data_class(hits_sim, hits_real) #(hits_train[:,:,:,0])[..., tf.newaxis]
 
 
-custom_metrics = [get_hit_average(), get_noise_average(), get_background_average(),\
-                    get_hit_average_order1(), get_hit_average_order2()]
-# %%
-#print(label1. add axis
-# %%
-class Residual(tf.keras.layers.Layer):
-    def __init__(self, filters):
-        super(Residual, self).__init__()
-        filters1, filters2, filters3 = filters
-        self.conv2a = tf.keras.layers.Conv2D(filters1, kernel_size=1, activation='relu', padding='same')
 
-        self.conv2b = tf.keras.layers.Conv2D(filters2, kernel_size=3, activation='relu', padding='same')
-
-        self.conv2c = tf.keras.layers.Conv2D(filters3, kernel_size=5, activation='relu', padding='same')
-
-        self.pool = tf.keras.layers.AveragePooling2D(pool_size=(2,2), strides=(1,1), padding='same')
-    def get_config(self):
-        config = super().get_config().copy()
-        config.update({
-
-        })  
-        return config                    
-    def call(self, inputs):
-        outa = self.conv2a(inputs)
-        outb = self.conv2b(inputs)
-        outc = self.conv2c(inputs)
-        outpool = self.pool(inputs)
-        conc_out = tf.keras.layers.concatenate([outa, outb, outc, outpool], axis=-1)
-        return conc_out
 # %%
 def inception_block(x, filters):
     filters1, filters2, filters3 = filters
@@ -146,29 +118,6 @@ else:
     out = Dense(1, activation='sigmoid', use_bias=False)(x)
     model = tf.keras.models.Model(inputs=inputs, outputs=out)
     model.summary()
-    """     model = Sequential()
-    model.add(Input(shape=(72, 32, 1)))
-    model.add(Residual(filters=(16, 16, 16)))
-    model.add(Conv2D(filters=16, kernel_size=5, activation='relu', padding='same'))
-    model.add(Conv2D(filters=32, kernel_size=3, strides=(2,2), activation='relu', padding='same'))
-    model.add(AveragePooling2D(pool_size=(2,2), strides=(2,2)))
-
-    model.add(Conv2D(filters=64, kernel_size=3, strides=(2,2), activation='relu', padding='same'))
-    model.add(Conv2D(filters=128, kernel_size=3, activation='relu', padding='same'))
-    model.add(AveragePooling2D(pool_size=(2,2), strides=(2,2))) 
-
-
-    model.add()
-    model.add(Dense(128, activation='relu'))
-    model.add(Dense(128, activation='relu'))
-    #model.add(tf.keras.layers.Dropout(0.25))
-    model.add(Dense(1, activation='sigmoid', use_bias=False))
-    #model.add(tf.keras.layers.Softmax()) 
-
-    model.add(Conv2DTranspose(filters=128 , kernel_size=3, strides=[2, 2],activation='relu', padding='same'))
-    model.add(Conv2DTranspose(filters=64 , kernel_size=3, strides=[2, 2],activation='relu', padding='same'))
-    model.add(Conv2DTranspose(filters=32 , kernel_size=3, strides=2,activation='relu', padding='same'))
-    model.add(Conv2D(1, kernel_size=3, activation='tanh', padding='same')) """
 
     if (load_weights == 1):
         del model
@@ -206,8 +155,7 @@ plt.ylabel('True positive rate')
 plt.title('ROC curve')
 plt.legend(loc='best')
 plt.show()
-# # single_event_plot(hits_noise_train, 48, -20.0, 20.0, 48, -20.0, 20.0, 0)
-# %%
+
 np.set_printoptions(precision=2)
 cm = confusion_matrix(label2, np.around(label_pred).astype(int), normalize='true')
 cm = np.around(cm,2)
@@ -216,31 +164,6 @@ plt.figure(figsize=(10,7))
 sn.heatmap(df_cm, annot=True)
 plt.xlabel('predicted labels')
 plt.ylabel('true labels')
-plt.show()
-# %%
-original_plt = tf.math.add(hits_test[:,:,:,0], tf.math.scalar_mul(2.0, hits_test[:,:,:,1]) )
-encoded = model.predict(hits_all_test, batch_size=50)
-# %%
-print(get_hit_average()(hits_test, tf.keras.layers.ReLU(threshold=0.7)(encoded)).numpy())
-
-def f1(thresholdx, mode, pred=encoded):
-    result = np.array([-1.])
-    for th in thresholdx:
-        if (mode==0):
-            av = get_hit_average()(hits_test, tf.keras.layers.ReLU(threshold=th)(pred)) 
-        elif (mode==1):
-            av = 1-get_noise_average()(hits_test, tf.keras.layers.ReLU(threshold=th)(pred))
-        result = np.append(result, av)
-    result = np.delete(result, 0)
-    return result
-
-t1 = np.arange(0., 1., 0.01)
-
-fig, ax = plt.subplots()
-ax.plot(t1, f1(t1, mode=0), '-', label='hit average')
-ax.plot(t1, f1(t1, mode=1), '-', label='1-noise average')
-ax.set(xlabel='cut', ylabel='average value')
-ax.legend()
 plt.show()
 
 
