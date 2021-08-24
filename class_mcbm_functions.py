@@ -6,7 +6,9 @@ import pandas as pd
 from matplotlib import colors
 from tensorflow.keras import losses
 from tensorflow.keras import backend as K
-
+import random
+import math
+from tqdm import tqdm
 
 def create_orderN(y_noise, order):
     if order==1:
@@ -102,6 +104,42 @@ def loadDataFile(datafile, pixel_x = 32, pixel_y = 72):
     hits_temp = tf.clip_by_value(hits_temp, clip_value_min=0., clip_value_max=1.)
     hits = tf.cast(hits_temp[..., tf.newaxis],dtype=tf.float32)
     print('load data from  ' + datafile + '  -> ' + str(len(hits[:])) + '  events loaded' )
+    return hits
+
+def random_p(p):
+    if(random.random() < p):
+        return 1
+    else:
+        return 0
+
+def getPixelNr(pixelId):
+    y = (pixelId-1)//32
+    x = ((pixelId-1)%32)
+    return x, y
+
+
+def createNoiseFromFile(datafile, p=0.7, pixel_x=32, pixel_y=72):
+    with open(datafile, 'r') as temp_f:
+        col_count = [ len(l.split(",")) for l in temp_f.readlines() ]
+    column_names = [i for i in range(0, max(col_count))]
+    hits = pd.read_csv(datafile,header=None ,index_col=0,comment='#', delimiter=",", nrows= 20000,names=column_names).values.astype('int32')
+    hits[hits < 0] = 0
+    
+    hits_temp = np.zeros([len(hits[:,0]), pixel_y, pixel_x])
+    for i in tqdm(range(len(hits[:,0]))):
+        for j in range(len(hits[0,:])):
+            if hits[i,j]==0:
+                break
+            x, y = getPixelNr(hits[i,j])
+            for k in range(-2, 2, 1):
+                for l in range(-2, 2, 1):
+                    if ((x+k)<0 or (x+k)>31) or ((y+l)<0 or (y+l)>71) or (k==0 and l==0):
+                        continue
+                    hits_temp[i, y+l, x+k]+= random_p(p/math.sqrt(k*k+l*l))
+            hits_temp[i, y, x]=1
+    hits_temp = tf.clip_by_value(hits_temp, clip_value_min=0., clip_value_max=1.)
+    hits = tf.cast(hits_temp[..., tf.newaxis],dtype=tf.float32)
+    print('loaded data from  ' + datafile + '  ->   noise generated!' )        
     return hits
 
 def get_hits_concat(hits_all, hits_true):

@@ -11,7 +11,6 @@ from ipywidgets import fixed
 from sklearn.metrics import roc_curve, auc, confusion_matrix
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
-import random
 import math
 #os.environ['AUTOGRAPH_VERBOSITY'] = 1
 gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -36,21 +35,13 @@ from wandb.keras import WandbCallback
 print('Tensorflow version: ' + tf.__version__)
 print("GPU is", "available" if tf.config.list_physical_devices('GPU') else "NOT available")
 # %%
-def random_p(p):
-    if(random.random() < p):
-        return 1
-    else:
-        return 0
+massive_hits = loadDataFile("E:/ML_data/mcbm_rich/05.08/hits_mass.txt")
+noiseProd_hits = createNoiseFromFile("E:/ML_data/mcbm_rich/05.08/hits_mass.txt")
+interactive_plot = widgets.interact(single_event_plot, \
+                    data=fixed(tf.squeeze(massive_hits,[3])), data0=fixed(tf.squeeze(noiseProd_hits+massive_hits,[3])), \
+                    nof_pixel_X=fixed(32), min_X=fixed(-8.1), max_X=fixed(13.1), \
+                    nof_pixel_Y=fixed(72), min_Y=fixed(-23.85), max_Y=fixed(23.85), eventNo=(50,100-1,1), cut=(0.,0.90,0.05))
 
-def random_kernel(p):
-    kernel = np.array([
-                        [0, 0, 0, 0, 0],
-                        [0, random_p(p/sqrt(2)), random_p(p), random_p(p/sqrt(2)), 0],
-                        [0, random_p(p), 1, random_p(p), 0],
-                        [0, random_p(p/sqrt(2)), random_p(p), random_p(p/sqrt(2)), 0],
-                        [0, 0, 0, 0, 0]])
-    #print(kernel)
-    return kernel
 
 # %%
 #X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=.5)
