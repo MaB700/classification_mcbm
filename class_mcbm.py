@@ -42,8 +42,8 @@ hits_all_test, hits_test = get_hits_concat(loadDataFile("E:/ML_data/mcbm_rich/28
                                            loadDataFile("E:/ML_data/mcbm_rich/28.07/hits_true_test.txt")) """
 
 def load_data_class(hits_sim, hits_real):
-    label_sim = tf.constant(0, shape=(len(hits_sim[:])))
-    label_real = tf.constant(1, shape=(len(hits_real[:])))
+    label_sim = tf.concat([tf.constant(1, shape=[len(hits_sim[:]), 1]), tf.constant(0, shape=[len(hits_sim[:]), 1])], 1)
+    label_real = tf.concat([tf.constant(0, shape=[len(hits_sim[:]), 1]), tf.constant(1, shape=[len(hits_sim[:]), 1])], 1)
     hits = tf.concat([hits_sim, hits_real], 0)
     labels = tf.concat([label_sim, label_real], 0)
     hits_trainx, hits_testx, label_trainx, label_testx = train_test_split(hits.numpy(), labels.numpy(), test_size=0.25)
@@ -84,7 +84,7 @@ def residual_block(x, filters):
     
 # %%
 
-load_model = 1
+load_model = 0
 load_file = "save.h5"
 
 load_weights = 0
@@ -114,7 +114,7 @@ else:
     x = Flatten()(x)
     x = Dense(128, activation='relu')(x)
     x = Dense(128, activation='relu')(x)
-    out = Dense(1, activation='sigmoid', use_bias=False)(x)
+    out = Dense(2, activation='sigmoid', use_bias=False)(x)
     model = tf.keras.models.Model(inputs=inputs, outputs=out)
     model.summary()
 
@@ -126,10 +126,10 @@ else:
 
     #opt = tf.keras.optimizers.Adadelta(lr=1.0, rho=0.95, epsilon=1e-07 )
     opt = tf.keras.optimizers.Adam(learning_rate=0.001)
-    model.compile(optimizer=opt, loss=tf.keras.losses.BinaryCrossentropy(), metrics=['accuracy'])
+    model.compile(optimizer=opt, loss=tf.keras.losses.CategoricalCrossentropy(), metrics=['accuracy'])
     es = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, mode='min')
     model.fit(hits1, label1,
-                    epochs=100,
+                    epochs=10,
                     batch_size=500,
                     shuffle=True,
                     validation_data=(hits2, label2),
@@ -140,11 +140,14 @@ else:
 #print('model evaluate ...\n')
 # %%
 label_sim_pred = model.predict(hits_sim)
-print(tf.reduce_mean(label_sim_pred))
+print(tf.reduce_mean(label_sim_pred[:,0]))
+print(tf.reduce_mean(label_sim_pred[:,1]))
 label_real_pred = model.predict(hits_real)
-print(tf.reduce_mean(label_real_pred))
+print(tf.reduce_mean(label_real_pred[:,0]))
+print(tf.reduce_mean(label_real_pred[:,1]))
 label_sim_noise_pred = model.predict(hits_sim_noise)
-print(tf.reduce_mean(label_sim_noise_pred))
+print(tf.reduce_mean(label_sim_noise_pred[:,0]))
+print(tf.reduce_mean(label_sim_noise_pred[:,1]))
 # %%
 """ 
 label_pred = model.predict(hits2)
@@ -167,9 +170,6 @@ sn.heatmap(df_cm, annot=True)
 plt.xlabel('predicted labels')
 plt.ylabel('true labels')
 plt.show()
-
-
-# %%
 interactive_plot = widgets.interact(single_event_plot, \
                     data=fixed(tf.squeeze(hits_real,[3])), data0=fixed(tf.squeeze(hits_sim,[3])), \
                     nof_pixel_X=fixed(32), min_X=fixed(-8.1), max_X=fixed(13.1), \
@@ -177,6 +177,9 @@ interactive_plot = widgets.interact(single_event_plot, \
 
 
 """
+
+
+# %%
 # # %%
 # #model.evaluate((hits_noise_test[14,:,:,:])[tf.newaxis,...], (hits_test[14,:,:,:])[tf.newaxis,...], verbose=1);
 # def hit_average_order2(data, y_pred):
