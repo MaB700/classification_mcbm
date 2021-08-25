@@ -84,7 +84,7 @@ def residual_block(x, filters):
     
 # %%
 
-load_model = 0
+load_model = 1
 load_file = "save.h5"
 
 load_weights = 0
@@ -170,13 +170,14 @@ sn.heatmap(df_cm, annot=True)
 plt.xlabel('predicted labels')
 plt.ylabel('true labels')
 plt.show()
-interactive_plot = widgets.interact(single_event_plot, \
-                    data=fixed(tf.squeeze(hits_real,[3])), data0=fixed(tf.squeeze(hits_sim,[3])), \
-                    nof_pixel_X=fixed(32), min_X=fixed(-8.1), max_X=fixed(13.1), \
-                    nof_pixel_Y=fixed(72), min_Y=fixed(-23.85), max_Y=fixed(23.85), eventNo=(50,100-1,1), cut=(0.,0.90,0.05))
-
-
 """
+interactive_plot = widgets.interact(single_event_plot, \
+                    data=fixed(tf.squeeze(hits_sim_noise,[3])), data0=fixed(tf.squeeze(hits_sim,[3])), \
+                    nof_pixel_X=fixed(32), min_X=fixed(-8.1), max_X=fixed(13.1), \
+                    nof_pixel_Y=fixed(72), min_Y=fixed(-23.85), max_Y=fixed(23.85), eventNo=(50,100-1,1), label_pred=fixed(label_sim_noise_pred), cut=(0.,0.90,0.05))
+
+
+
 
 
 # %%

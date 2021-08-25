@@ -152,11 +152,11 @@ def get_hits_concat(hits_all, hits_true):
 
 
 
-def single_event_plot(data, data0, nof_pixel_X, min_X, max_X, nof_pixel_Y, min_Y, max_Y, eventNo, cut=0.):
+def single_event_plot(data, data0, nof_pixel_X, min_X, max_X, nof_pixel_Y, min_Y, max_Y, eventNo, label_pred, cut=0.):
     plt.figure(figsize=(20, 10))
     ax = plt.subplot(1, 2, 1)
     plt.imshow(tf.cast(data[eventNo] > cut, data[eventNo].dtype) * data[eventNo], interpolation='none', extent=[min_X,max_X,min_Y,max_Y], cmap='gray')
-    plt.title("denoised")
+    plt.title('sim = {:.3f}   real = {:.3f}'.format(label_pred[eventNo,0], label_pred[eventNo,1]))
     #y = tf.maximum(data[eventNo], 0.5)
     plt.colorbar()
     #plt.gray()
