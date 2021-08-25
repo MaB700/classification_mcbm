@@ -35,15 +35,6 @@ from wandb.keras import WandbCallback
 print('Tensorflow version: ' + tf.__version__)
 print("GPU is", "available" if tf.config.list_physical_devices('GPU') else "NOT available")
 # %%
-massive_hits = loadDataFile("./data/hits_mass.txt")
-noiseProd_hits = createNoiseFromFile("./data/hits_mass.txt")
-interactive_plot = widgets.interact(single_event_plot, \
-                    data=fixed(tf.squeeze(massive_hits,[3])), data0=fixed(tf.squeeze(noiseProd_hits+massive_hits,[3])), \
-                    nof_pixel_X=fixed(32), min_X=fixed(-8.1), max_X=fixed(13.1), \
-                    nof_pixel_Y=fixed(72), min_Y=fixed(-23.85), max_Y=fixed(23.85), eventNo=(50,100-1,1), cut=(0.,0.90,0.05))
-
-
-# %%
 #X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=.5)
 """ hits_all_train, hits_train = get_hits_concat(loadDataFile("E:/ML_data/mcbm_rich/28.07/hits_all.txt"), \
                                              loadDataFile("E:/ML_data/mcbm_rich/28.07/hits_true.txt"))
@@ -60,12 +51,20 @@ def load_data_class(hits_sim, hits_real):
     return tf.convert_to_tensor(hits_trainx), tf.convert_to_tensor(hits_testx), \
            tf.convert_to_tensor(label_trainx), tf.convert_to_tensor(label_testx)
 
-hits_sim = loadDataFile("E:/ML_data/mcbm_rich/28.07/hits_all.txt")
+hits_sim = loadDataFile("./data/hits_all.txt")
 hits_real = loadDataFile("E:/ML_data/mcbm_rich/real/hits_real.txt")
 hits1, hits2, label1, label2 = load_data_class(hits_sim, hits_real) #(hits_train[:,:,:,0])[..., tf.newaxis]
+massive_hits = loadDataFile("./data/hits_mass.txt")
+# %%
+noiseProd_hits = createNoiseFromFile("./data/hits_mass.txt", p=20.5)
+hits_sim_noise = tf.add(hits_sim, noiseProd_hits)
+hits_sim_noise = tf.clip_by_value(hits_sim_noise, clip_value_min=0., clip_value_max=1.)
+""" interactive_plot = widgets.interact(single_event_plot, \
+                    data=fixed(tf.squeeze(hits_sim,[3])), data0=fixed(tf.squeeze(hits_sim_noise+massive_hits,[3])), \
+                    nof_pixel_X=fixed(32), min_X=fixed(-8.1), max_X=fixed(13.1), \
+                    nof_pixel_Y=fixed(72), min_Y=fixed(-23.85), max_Y=fixed(23.85), eventNo=(50,100-1,1), cut=(0.,0.90,0.05))
 
-
-
+"""
 # %%
 def inception_block(x, filters):
     filters1, filters2, filters3 = filters
@@ -85,7 +84,7 @@ def residual_block(x, filters):
     
 # %%
 
-load_model = 0
+load_model = 1
 load_file = "save.h5"
 
 load_weights = 0
@@ -106,9 +105,9 @@ else:
     inputs = Input(shape=(72, 32, 1))
     x = Conv2D(filters=16, kernel_size=5, activation='relu', padding='same')(inputs)
     x = Conv2D(filters=32, kernel_size=3, strides=(2,2), activation='relu', padding='same')(x)
-    x = residual_block(x, (2, 32))
+    #x = residual_block(x, (2, 32))
     x = AveragePooling2D(pool_size=(2,2), strides=(2,2))(x)
-    x = inception_block(x, (16, 16, 16))
+    #x = inception_block(x, (16, 16, 16))
     x = Conv2D(filters=64, kernel_size=3, strides=(2,2), activation='relu', padding='same')(x)
     x = Conv2D(filters=128, kernel_size=3, activation='relu', padding='same')(x)
     x = AveragePooling2D(pool_size=(2,2), strides=(2,2))(x)
@@ -130,11 +129,11 @@ else:
     model.compile(optimizer=opt, loss=tf.keras.losses.BinaryCrossentropy(), metrics=['accuracy'])
     es = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, mode='min')
     model.fit(hits1, label1,
-                    epochs=10,
+                    epochs=100,
                     batch_size=500,
                     shuffle=True,
                     validation_data=(hits2, label2),
-                    callbacks=[model_checkpoint_callback])#,
+                    callbacks=[model_checkpoint_callback, es])#,
                     #callbacks=[WandbCallback(log_weights=True)])
     #model_checkpoint_callback.best 
     model.save("save.h5")
@@ -144,7 +143,10 @@ label_sim_pred = model.predict(hits_sim)
 print(tf.reduce_mean(label_sim_pred))
 label_real_pred = model.predict(hits_real)
 print(tf.reduce_mean(label_real_pred))
+label_sim_noise_pred = model.predict(hits_sim_noise)
+print(tf.reduce_mean(label_sim_noise_pred))
 # %%
+""" 
 label_pred = model.predict(hits2)
 fpr, tpr, th = roc_curve(label2, label_pred)
 auc = auc(fpr, tpr)
@@ -174,7 +176,7 @@ interactive_plot = widgets.interact(single_event_plot, \
                     nof_pixel_Y=fixed(72), min_Y=fixed(-23.85), max_Y=fixed(23.85), eventNo=(50,100-1,1), cut=(0.,0.90,0.05))
 
 
-
+"""
 # # %%
 # #model.evaluate((hits_noise_test[14,:,:,:])[tf.newaxis,...], (hits_test[14,:,:,:])[tf.newaxis,...], verbose=1);
 # def hit_average_order2(data, y_pred):
