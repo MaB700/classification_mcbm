@@ -88,11 +88,11 @@ def get_custom_loss():
     return custom_loss
 
 # load data file and some preprocessing 
-def loadDataFile(datafile, pixel_x = 32, pixel_y = 72):
+def loadDataFile(datafile, nofRows=20000, pixel_x = 32, pixel_y = 72):
     with open(datafile, 'r') as temp_f:
         col_count = [ len(l.split(",")) for l in temp_f.readlines() ]
     column_names = [i for i in range(0, max(col_count))]
-    hits = pd.read_csv(datafile,header=None ,index_col=0,comment='#', delimiter=",", nrows= 20000,names=column_names).values.astype('int32')
+    hits = pd.read_csv(datafile,header=None ,index_col=0,comment='#', delimiter=",", nrows= nofRows,names=column_names).values.astype('int32')
     hits[hits < 0] = 0
     hits_temp = np.zeros([len(hits[:,0]), pixel_x*pixel_y])
     for i in range(len(hits[:,0])):

@@ -43,7 +43,7 @@ hits_all_test, hits_test = get_hits_concat(loadDataFile("E:/ML_data/mcbm_rich/28
 
 def load_data_class(hits_sim, hits_real):
     label_sim = tf.concat([tf.constant(1, shape=[len(hits_sim[:]), 1]), tf.constant(0, shape=[len(hits_sim[:]), 1])], 1)
-    label_real = tf.concat([tf.constant(0, shape=[len(hits_sim[:]), 1]), tf.constant(1, shape=[len(hits_sim[:]), 1])], 1)
+    label_real = tf.concat([tf.constant(0, shape=[len(hits_real[:]), 1]), tf.constant(1, shape=[len(hits_real[:]), 1])], 1)
     hits = tf.concat([hits_sim, hits_real], 0)
     labels = tf.concat([label_sim, label_real], 0)
     hits_trainx, hits_testx, label_trainx, label_testx = train_test_split(hits.numpy(), labels.numpy(), test_size=0.25)
@@ -51,13 +51,14 @@ def load_data_class(hits_sim, hits_real):
     return tf.convert_to_tensor(hits_trainx), tf.convert_to_tensor(hits_testx), \
            tf.convert_to_tensor(label_trainx), tf.convert_to_tensor(label_testx)
 
-hits_sim = loadDataFile("./data/hits_all.txt")
-hits_real = loadDataFile("E:/ML_data/mcbm_rich/real/hits_real.txt")
+hits_sim = loadDataFile("./data/test/hits_all.txt")
+hits_real = loadDataFile("E:/ML_data/mcbm_rich/real/hits_real.txt", nofRows=50000)
 hits1, hits2, label1, label2 = load_data_class(hits_sim, hits_real) #(hits_train[:,:,:,0])[..., tf.newaxis]
-massive_hits = loadDataFile("./data/hits_mass.txt")
 # %%
-noiseProd_hits = createNoiseFromFile("./data/hits_mass.txt", p=20.5)
-hits_sim_noise = tf.add(hits_sim, noiseProd_hits)
+hits_sim2 = loadDataFile("./data/test/hits_all2.txt")
+massive_hits = loadDataFile("./data/test/hits_mass2.txt")
+noiseProd_hits = createNoiseFromFile("./data/test/hits_mass2.txt", p=1.8)
+hits_sim_noise = tf.add(hits_sim2, noiseProd_hits)
 hits_sim_noise = tf.clip_by_value(hits_sim_noise, clip_value_min=0., clip_value_max=1.)
 """ interactive_plot = widgets.interact(single_event_plot, \
                     data=fixed(tf.squeeze(hits_sim,[3])), data0=fixed(tf.squeeze(hits_sim_noise+massive_hits,[3])), \
@@ -84,7 +85,7 @@ def residual_block(x, filters):
     
 # %%
 
-load_model = 1
+load_model = 0
 load_file = "save.h5"
 
 load_weights = 0
@@ -103,17 +104,18 @@ if (load_model == 1):
     print('done!')
 else:
     inputs = Input(shape=(72, 32, 1))
-    x = Conv2D(filters=16, kernel_size=5, activation='relu', padding='same')(inputs)
+    x = Conv2D(filters=16, kernel_size=3, activation='relu', padding='same')(inputs)
+    x = inception_block(x, (16, 16, 16))
     x = Conv2D(filters=32, kernel_size=3, strides=(2,2), activation='relu', padding='same')(x)
     #x = residual_block(x, (2, 32))
-    x = AveragePooling2D(pool_size=(2,2), strides=(2,2))(x)
-    #x = inception_block(x, (16, 16, 16))
-    x = Conv2D(filters=64, kernel_size=3, strides=(2,2), activation='relu', padding='same')(x)
-    x = Conv2D(filters=128, kernel_size=3, activation='relu', padding='same')(x)
-    x = AveragePooling2D(pool_size=(2,2), strides=(2,2))(x)
+    x = tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2))(x)
+    x = inception_block(x, (16, 16, 16))
+    x = Conv2D(filters=16, kernel_size=3, strides=(2,2), activation='relu', padding='same')(x)
+    x = Conv2D(filters=32, kernel_size=3, activation='relu', padding='same')(x)
+    x = tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2))(x)
     x = Flatten()(x)
-    x = Dense(128, activation='relu')(x)
-    x = Dense(128, activation='relu')(x)
+    x = Dense(64, activation='relu')(x)
+    x = Dense(64, activation='relu')(x)
     out = Dense(2, activation='sigmoid', use_bias=False)(x)
     model = tf.keras.models.Model(inputs=inputs, outputs=out)
     model.summary()
@@ -127,13 +129,13 @@ else:
     #opt = tf.keras.optimizers.Adadelta(lr=1.0, rho=0.95, epsilon=1e-07 )
     opt = tf.keras.optimizers.Adam(learning_rate=0.001)
     model.compile(optimizer=opt, loss=tf.keras.losses.CategoricalCrossentropy(), metrics=['accuracy'])
-    es = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, mode='min')
+    es = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, mode='min')
     model.fit(hits1, label1,
-                    epochs=10,
+                    epochs=100,
                     batch_size=500,
                     shuffle=True,
                     validation_data=(hits2, label2),
-                    callbacks=[model_checkpoint_callback, es])#,
+                    callbacks=[ es])#,model_checkpoint_callback,
                     #callbacks=[WandbCallback(log_weights=True)])
     #model_checkpoint_callback.best 
     model.save("save.h5")
@@ -172,7 +174,7 @@ plt.ylabel('true labels')
 plt.show()
 """
 interactive_plot = widgets.interact(single_event_plot, \
-                    data=fixed(tf.squeeze(hits_sim_noise,[3])), data0=fixed(tf.squeeze(hits_sim,[3])), \
+                    data=fixed(tf.squeeze(hits_sim_noise,[3])), data0=fixed(tf.squeeze(hits_sim2,[3])), \
                     nof_pixel_X=fixed(32), min_X=fixed(-8.1), max_X=fixed(13.1), \
                     nof_pixel_Y=fixed(72), min_Y=fixed(-23.85), max_Y=fixed(23.85), eventNo=(50,100-1,1), label_pred=fixed(label_sim_noise_pred), cut=(0.,0.90,0.05))
 
