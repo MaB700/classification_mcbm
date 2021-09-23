@@ -9,6 +9,7 @@ from tensorflow.keras import backend as K
 import random
 import math
 from tqdm import tqdm
+from sklearn.model_selection import train_test_split
 
 def create_orderN(y_noise, order):
     if order==1:
@@ -88,7 +89,7 @@ def get_custom_loss():
     return custom_loss
 
 # load data file and some preprocessing 
-def loadDataFile(datafile, nofRows=20000, pixel_x = 32, pixel_y = 72):
+def loadDataFile(datafile, nofRows=None, pixel_x = 32, pixel_y = 72):
     with open(datafile, 'r') as temp_f:
         col_count = [ len(l.split(",")) for l in temp_f.readlines() ]
     column_names = [i for i in range(0, max(col_count))]
@@ -118,11 +119,11 @@ def getPixelNr(pixelId):
     return x, y
 
 
-def createNoiseFromFile(datafile, p=0.7, pixel_x=32, pixel_y=72):
+def createNoiseFromFile(datafile, p=0.7, nofRows=None, pixel_x=32, pixel_y=72):
     with open(datafile, 'r') as temp_f:
         col_count = [ len(l.split(",")) for l in temp_f.readlines() ]
     column_names = [i for i in range(0, max(col_count))]
-    hits = pd.read_csv(datafile,header=None ,index_col=0,comment='#', delimiter=",", nrows= 20000,names=column_names).values.astype('int32')
+    hits = pd.read_csv(datafile,header=None ,index_col=0,comment='#', delimiter=",", nrows= nofRows,names=column_names).values.astype('int32')
     hits[hits < 0] = 0
     
     hits_temp = np.zeros([len(hits[:,0]), pixel_y, pixel_x])
@@ -157,13 +158,20 @@ def get_hits_concat(hits_all, hits_true):
     order2 = tf.clip_by_value(order2, clip_value_min=0., clip_value_max=1.)
     return hits_all, tf.concat([hits_true, noise, order1, order2], 3)
 
+def get_hits_concat_split(hits_all, hits_true, test_split=0.15):
+    noise = tf.clip_by_value(tf.math.add(hits_all, -hits_true),clip_value_min=0., clip_value_max=1.)
+    order1 = create_orderN(noise, 1)
+    order2 = create_orderN(noise, 2)
+    order2 -= order1
+    order2 = tf.clip_by_value(order2, clip_value_min=0., clip_value_max=1.)
+    hits_all, hits_all_test, hits_true, hits_true_test, noise, noise_test, order1, order1_test, order2, order2_test =\
+    train_test_split(hits_all.numpy(), hits_true.numpy(), noise.numpy(), order1.numpy(), order2.numpy(), test_size=test_split)
+    return hits_all, hits_all_test, tf.concat([hits_true, noise, order1, order2], 3), tf.concat([hits_true_test, noise_test, order1_test, order2_test], 3)
 
-
-def single_event_plot(data, data0, nof_pixel_X, min_X, max_X, nof_pixel_Y, min_Y, max_Y, eventNo, label_pred, cut=0.):
+def single_event_plot(data, data0, nof_pixel_X, min_X, max_X, nof_pixel_Y, min_Y, max_Y, eventNo, cut=0.):
     plt.figure(figsize=(20, 10))
     ax = plt.subplot(1, 2, 1)
     plt.imshow(tf.cast(data[eventNo] > cut, data[eventNo].dtype) * data[eventNo], interpolation='none', extent=[min_X,max_X,min_Y,max_Y], cmap='gray')
-    plt.title('sim = {:.3f}   real = {:.3f}'.format(label_pred[eventNo,0], label_pred[eventNo,1]))
     #y = tf.maximum(data[eventNo], 0.5)
     plt.colorbar()
     #plt.gray()

@@ -35,7 +35,7 @@ from wandb.keras import WandbCallback
 print('Tensorflow version: ' + tf.__version__)
 print("GPU is", "available" if tf.config.list_physical_devices('GPU') else "NOT available")
 # %%
-#X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=.5)
+#loading data ....
 """ hits_all_train, hits_train = get_hits_concat(loadDataFile("E:/ML_data/mcbm_rich/28.07/hits_all.txt"), \
                                              loadDataFile("E:/ML_data/mcbm_rich/28.07/hits_true.txt"))
 hits_all_test, hits_test = get_hits_concat(loadDataFile("E:/ML_data/mcbm_rich/28.07/hits_all_test.txt"), \
@@ -51,21 +51,17 @@ def load_data_class(hits_sim, hits_real):
     return tf.convert_to_tensor(hits_trainx), tf.convert_to_tensor(hits_testx), \
            tf.convert_to_tensor(label_trainx), tf.convert_to_tensor(label_testx)
 
-hits_sim = loadDataFile("./data/test/hits_all.txt")
-hits_real = loadDataFile("E:/ML_data/mcbm_rich/real/hits_real.txt", nofRows=50000)
-hits1, hits2, label1, label2 = load_data_class(hits_sim, hits_real) #(hits_train[:,:,:,0])[..., tf.newaxis]
-# %%
-hits_sim2 = loadDataFile("./data/test/hits_all2.txt")
-massive_hits = loadDataFile("./data/test/hits_mass2.txt")
-noiseProd_hits = createNoiseFromFile("./data/test/hits_mass2.txt", p=0.475)
-hits_sim_noise = tf.add(hits_sim2, noiseProd_hits)
-hits_sim_noise = tf.clip_by_value(hits_sim_noise, clip_value_min=0., clip_value_max=1.)
-""" interactive_plot = widgets.interact(single_event_plot, \
-                    data=fixed(tf.squeeze(hits_sim,[3])), data0=fixed(tf.squeeze(hits_sim_noise+massive_hits,[3])), \
-                    nof_pixel_X=fixed(32), min_X=fixed(-8.1), max_X=fixed(13.1), \
-                    nof_pixel_Y=fixed(72), min_Y=fixed(-23.85), max_Y=fixed(23.85), eventNo=(50,100-1,1), cut=(0.,0.90,0.05))
+hits_sim_all = loadDataFile("E:/ML_data/mcbm_rich/05.08/hits_all.txt")
+hits_sim_true = loadDataFile("E:/ML_data/mcbm_rich/05.08/hits_true.txt")
+hits_noise_prod = createNoiseFromFile("E:/ML_data/mcbm_rich/05.08/hits_mass.txt", p=0.475)
+hits_sim_all = tf.add(hits_sim_all, hits_noise_prod)
+del hits_noise_prod
+hits_sim_all = tf.clip_by_value(hits_sim_all, clip_value_min=0., clip_value_max=1.)
+hits_sim_all, hits_sim_all_test, hits_sim_true, hits_sim_true_test = \
+    get_hits_concat_split(hits_sim_all, hits_sim_true)
 
-"""
+hits_real = loadDataFile("E:/ML_data/mcbm_rich/real/hits_real.txt", nofRows=200)
+print("data loaded!")
 # %%
 def inception_block(x, filters):
     filters1, filters2, filters3 = filters
@@ -85,7 +81,7 @@ def residual_block(x, filters):
     
 # %%
 
-load_model = 1
+load_model = 0
 load_file = "save.h5"
 
 load_weights = 0
@@ -98,25 +94,22 @@ model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
     save_best_only=True,
     verbose=1)
 
+custom_metrics = [get_hit_average(), get_noise_average(), get_background_average(),\
+                    get_hit_average_order1(), get_hit_average_order2()]
+
 if (load_model == 1):
     print('loading model from file ' + load_file + ' ...')
     model = tf.keras.models.load_model(load_file)
     print('done!')
 else:
     inputs = Input(shape=(72, 32, 1))
-    #x = Conv2D(filters=64, kernel_size=3, strides=(2,2), activation='relu', padding='same')(inputs)
-    x = inception_block(inputs, (128, 64, 32))
-    x = Conv2D(filters=64, kernel_size=3, strides=(2,2), activation='relu', padding='same')(x)
-    #x = tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2))(x)
-    x = inception_block(x, (128, 64, 32))
-    x = Conv2D(filters=64, kernel_size=3, strides=(2,2), activation='relu', padding='same')(x)
-    #x = inception_block(x, (128, 64, 32))
-    #x = Conv2D(filters=64, kernel_size=3, strides=(2,2), activation='relu', padding='same')(x)
-    #x = tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2))(x)
-    x = Flatten()(x)
-    x = Dense(64, activation='relu')(x)
-    x = Dense(64, activation='relu')(x)
-    out = Dense(2, activation='softmax')(x)
+    x = Conv2D(filters=32, kernel_size=3, strides=2, activation='relu', padding='same')(inputs)
+    x = Conv2D(filters=64, kernel_size=3, strides=2, activation='relu', padding='same')(x)
+    x = Conv2D(filters=128, kernel_size=3, strides=2, activation='relu', padding='same')(x)
+    x = Conv2DTranspose(filters=128, kernel_size=3, strides=2, activation='relu', padding='same')(x)
+    x = Conv2DTranspose(filters=64, kernel_size=3, strides=2, activation='relu', padding='same')(x)
+    x = Conv2DTranspose(filters=32, kernel_size=3, strides=2, activation='relu', padding='same')(x)
+    out = Conv2D(1, kernel_size=3, activation='tanh', padding='same')(x)
     model = tf.keras.models.Model(inputs=inputs, outputs=out)
     model.summary()
 
@@ -128,59 +121,31 @@ else:
 
     #opt = tf.keras.optimizers.Adadelta(lr=1.0, rho=0.95, epsilon=1e-07 )
     opt = tf.keras.optimizers.Adam(learning_rate=0.001)
-    model.compile(optimizer=opt, loss=tf.keras.losses.CategoricalCrossentropy(), metrics=['accuracy'])
-    es = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, mode='min')
-    model.fit(hits1, label1,
+    model.compile(optimizer=opt, loss=get_custom_loss(), metrics=custom_metrics)
+    es = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, mode='min')
+    model.fit(hits_sim_all, hits_sim_true,
                     epochs=30,
                     batch_size=200,
                     shuffle=True,
-                    validation_data=(hits2, label2),
+                    validation_data=(hits_sim_all_test, hits_sim_true_test),
                     callbacks=[ ])#,model_checkpoint_callback,
                     #callbacks=[WandbCallback(log_weights=True)])
     #model_checkpoint_callback.best 
-    model.save("save.h5")
+    
+    #model.save("save.h5")
 #print('model evaluate ...\n')
 # %%
-label_sim_pred = model.predict(hits_sim) # (1,0)
-print(tf.reduce_mean(label_sim_pred[:,0]))
-print(tf.reduce_mean(label_sim_pred[:,1]))
-label_real_pred = model.predict(hits_real) # (0,1)
-print(tf.reduce_mean(label_real_pred[:,0]))
-print(tf.reduce_mean(label_real_pred[:,1]))
-label_sim_noise_pred = model.predict(hits_sim_noise) # -> (0,1)
-print(tf.reduce_mean(label_sim_noise_pred[:,0]))
-print(tf.reduce_mean(label_sim_noise_pred[:,1]))
-# %%
-""" 
-label_pred = model.predict(hits2)
-fpr, tpr, th = roc_curve(label2, label_pred)
-auc = auc(fpr, tpr)
-plt.plot([0, 1], [0, 1], 'k--')
-plt.plot(fpr, tpr, label='auc = {:.3f}'.format(auc))
-plt.xlabel('False positive rate')
-plt.ylabel('True positive rate')
-plt.title('ROC curve')
-plt.legend(loc='best')
-plt.show()
-
-np.set_printoptions(precision=2)
-cm = confusion_matrix(label2, np.around(label_pred).astype(int), normalize='true')
-cm = np.around(cm,2)
-df_cm = pd.DataFrame(cm, index = [i for i in "01"], columns = [i for i in "01"])
-plt.figure(figsize=(10,7))
-sn.heatmap(df_cm, annot=True)
-plt.xlabel('predicted labels')
-plt.ylabel('true labels')
-plt.show()
-"""
+prediction = model.predict(hits_sim_all_test, batch_size=50)
 interactive_plot = widgets.interact(single_event_plot, \
-                    data=fixed(tf.squeeze(hits_sim_noise,[3])), data0=fixed(tf.squeeze(hits_sim2,[3])), \
+                    data=fixed(tf.squeeze(prediction,[3])), data0=fixed(2*hits_sim_true_test[:,:,:,1]+hits_sim_true_test[:,:,:,0]), \
                     nof_pixel_X=fixed(32), min_X=fixed(-8.1), max_X=fixed(13.1), \
-                    nof_pixel_Y=fixed(72), min_Y=fixed(-23.85), max_Y=fixed(23.85), eventNo=(50,100-1,1), label_pred=fixed(label_sim_noise_pred), cut=(0.,0.90,0.05))
-
-
-
-
+                    nof_pixel_Y=fixed(72), min_Y=fixed(-23.85), max_Y=fixed(23.85), eventNo=(50,100-1,1),  cut=(0.,0.90,0.05))
+# %%
+pred_real = model.predict(hits_real)
+interactive_plot = widgets.interact(single_event_plot, \
+                data=fixed(tf.squeeze(pred_real,[3])), data0=fixed(tf.squeeze(pred_real,[3])), \
+                nof_pixel_X=fixed(32), min_X=fixed(-8.1), max_X=fixed(13.1), \
+                nof_pixel_Y=fixed(72), min_Y=fixed(-23.85), max_Y=fixed(23.85), eventNo=(50,100-1,1), cut=(0.,0.90,0.05))
 
 # %%
 # # %%
