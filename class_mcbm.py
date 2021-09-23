@@ -57,7 +57,7 @@ hits1, hits2, label1, label2 = load_data_class(hits_sim, hits_real) #(hits_train
 # %%
 hits_sim2 = loadDataFile("./data/test/hits_all2.txt")
 massive_hits = loadDataFile("./data/test/hits_mass2.txt")
-noiseProd_hits = createNoiseFromFile("./data/test/hits_mass2.txt", p=1.8)
+noiseProd_hits = createNoiseFromFile("./data/test/hits_mass2.txt", p=0.475)
 hits_sim_noise = tf.add(hits_sim2, noiseProd_hits)
 hits_sim_noise = tf.clip_by_value(hits_sim_noise, clip_value_min=0., clip_value_max=1.)
 """ interactive_plot = widgets.interact(single_event_plot, \
@@ -78,14 +78,14 @@ def inception_block(x, filters):
 def residual_block(x, filters):
     xi = Conv2D(filters[0], kernel_size=3, activation='relu', padding='same')(x)
     for i in range(len(filters)-1):
-        xi = Conv2D(filters[i+1], kernel_size=3, activation='relu', padding='same')(xi)
+        xi = Conv2D(filters[i+1], kernel_size=3, padding='same')(xi)
     out = tf.keras.layers.add([xi, x]) # number of filter in the last layer has to match input (x) feature maps 
     return tf.nn.relu(out)
     
     
 # %%
 
-load_model = 0
+load_model = 1
 load_file = "save.h5"
 
 load_weights = 0
@@ -104,19 +104,19 @@ if (load_model == 1):
     print('done!')
 else:
     inputs = Input(shape=(72, 32, 1))
-    x = Conv2D(filters=16, kernel_size=3, activation='relu', padding='same')(inputs)
-    x = inception_block(x, (16, 16, 16))
-    x = Conv2D(filters=32, kernel_size=3, strides=(2,2), activation='relu', padding='same')(x)
-    #x = residual_block(x, (2, 32))
-    x = tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2))(x)
-    x = inception_block(x, (16, 16, 16))
-    x = Conv2D(filters=16, kernel_size=3, strides=(2,2), activation='relu', padding='same')(x)
-    x = Conv2D(filters=32, kernel_size=3, activation='relu', padding='same')(x)
-    x = tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2))(x)
+    #x = Conv2D(filters=64, kernel_size=3, strides=(2,2), activation='relu', padding='same')(inputs)
+    x = inception_block(inputs, (128, 64, 32))
+    x = Conv2D(filters=64, kernel_size=3, strides=(2,2), activation='relu', padding='same')(x)
+    #x = tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2))(x)
+    x = inception_block(x, (128, 64, 32))
+    x = Conv2D(filters=64, kernel_size=3, strides=(2,2), activation='relu', padding='same')(x)
+    #x = inception_block(x, (128, 64, 32))
+    #x = Conv2D(filters=64, kernel_size=3, strides=(2,2), activation='relu', padding='same')(x)
+    #x = tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2))(x)
     x = Flatten()(x)
     x = Dense(64, activation='relu')(x)
     x = Dense(64, activation='relu')(x)
-    out = Dense(2, activation='sigmoid', use_bias=False)(x)
+    out = Dense(2, activation='softmax')(x)
     model = tf.keras.models.Model(inputs=inputs, outputs=out)
     model.summary()
 
@@ -129,25 +129,25 @@ else:
     #opt = tf.keras.optimizers.Adadelta(lr=1.0, rho=0.95, epsilon=1e-07 )
     opt = tf.keras.optimizers.Adam(learning_rate=0.001)
     model.compile(optimizer=opt, loss=tf.keras.losses.CategoricalCrossentropy(), metrics=['accuracy'])
-    es = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, mode='min')
+    es = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, mode='min')
     model.fit(hits1, label1,
-                    epochs=100,
-                    batch_size=500,
+                    epochs=30,
+                    batch_size=200,
                     shuffle=True,
                     validation_data=(hits2, label2),
-                    callbacks=[ es])#,model_checkpoint_callback,
+                    callbacks=[ ])#,model_checkpoint_callback,
                     #callbacks=[WandbCallback(log_weights=True)])
     #model_checkpoint_callback.best 
     model.save("save.h5")
 #print('model evaluate ...\n')
 # %%
-label_sim_pred = model.predict(hits_sim)
+label_sim_pred = model.predict(hits_sim) # (1,0)
 print(tf.reduce_mean(label_sim_pred[:,0]))
 print(tf.reduce_mean(label_sim_pred[:,1]))
-label_real_pred = model.predict(hits_real)
+label_real_pred = model.predict(hits_real) # (0,1)
 print(tf.reduce_mean(label_real_pred[:,0]))
 print(tf.reduce_mean(label_real_pred[:,1]))
-label_sim_noise_pred = model.predict(hits_sim_noise)
+label_sim_noise_pred = model.predict(hits_sim_noise) # -> (0,1)
 print(tf.reduce_mean(label_sim_noise_pred[:,0]))
 print(tf.reduce_mean(label_sim_noise_pred[:,1]))
 # %%

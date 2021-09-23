@@ -107,7 +107,7 @@ def loadDataFile(datafile, nofRows=20000, pixel_x = 32, pixel_y = 72):
     return hits
 
 def random_p(p):
-    if(random.random() < p):
+    if(random.betavariate(5,2) < p):
         return 1
     else:
         return 0
@@ -126,16 +126,23 @@ def createNoiseFromFile(datafile, p=0.7, pixel_x=32, pixel_y=72):
     hits[hits < 0] = 0
     
     hits_temp = np.zeros([len(hits[:,0]), pixel_y, pixel_x])
+    nofNoiseHits = 0
     for i in tqdm(range(len(hits[:,0]))):
         for j in range(len(hits[0,:])):
             if hits[i,j]==0:
                 break
+            nofNoiseHits += 1
             x, y = getPixelNr(hits[i,j])
             for k in range(-2, 2, 1):
                 for l in range(-2, 2, 1):
                     if ((x+k)<0 or (x+k)>31) or ((y+l)<0 or (y+l)>71) or (k==0 and l==0):
                         continue
-                    hits_temp[i, y+l, x+k]+= random_p(p/math.sqrt(k*k+l*l))
+                    elif (nofNoiseHits % 10 == 0):
+                        hits_temp[i, y+l, x+k]+= random_p(2.0*p/math.sqrt(k*k+l*l))
+                    elif (nofNoiseHits % 3 == 0):
+                        hits_temp[i, y+l, x+k]+= random_p(1.6*p/math.sqrt(k*k+l*l))
+                    else :
+                        hits_temp[i, y+l, x+k]+= random_p(1.15*p/math.sqrt(k*k+l*l))
             hits_temp[i, y, x]=1
     hits_temp = tf.clip_by_value(hits_temp, clip_value_min=0., clip_value_max=1.)
     hits = tf.cast(hits_temp[..., tf.newaxis],dtype=tf.float32)
