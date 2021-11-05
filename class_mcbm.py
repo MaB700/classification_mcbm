@@ -124,11 +124,11 @@ else:
     model.compile(optimizer=opt, loss=get_custom_loss(), metrics=custom_metrics)
     es = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, mode='min')
     model.fit(hits_sim_all, hits_sim_true,
-                    epochs=30,
+                    epochs=50,
                     batch_size=200,
                     shuffle=True,
                     validation_data=(hits_sim_all_test, hits_sim_true_test),
-                    callbacks=[ ])#,model_checkpoint_callback,
+                    callbacks=[ es])#,model_checkpoint_callback,
                     #callbacks=[WandbCallback(log_weights=True)])
     #model_checkpoint_callback.best 
     

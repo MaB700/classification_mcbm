@@ -172,6 +172,7 @@ def single_event_plot(data, data0, nof_pixel_X, min_X, max_X, nof_pixel_Y, min_Y
     plt.figure(figsize=(20, 10))
     ax = plt.subplot(1, 2, 1)
     plt.imshow(tf.cast(data[eventNo] > cut, data[eventNo].dtype) * data[eventNo], interpolation='none', extent=[min_X,max_X,min_Y,max_Y], cmap='gray')
+    plt.title("event after noise removal")
     #y = tf.maximum(data[eventNo], 0.5)
     plt.colorbar()
     #plt.gray()
@@ -180,7 +181,7 @@ def single_event_plot(data, data0, nof_pixel_X, min_X, max_X, nof_pixel_Y, min_Y
     bounds = [0,0.1,1.25,2.5,3.5]
     norm = colors.BoundaryNorm(bounds, cmap.N)
     plt.imshow(data0[eventNo], interpolation='none', extent=[min_X,max_X,min_Y,max_Y], cmap=cmap, norm=norm)
-    plt.title("original")
+    plt.title("original event")
     #plt.colorbar()
     plt.show()
     return
